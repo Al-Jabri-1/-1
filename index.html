@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برنامج تتبع صلاحية البضاعة</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+        }
+
+        .page {
+            margin: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        .red {
+            background-color: #ffcccc;
+        }
+
+        .yellow {
+            background-color: #ffffcc;
+        }
+
+        .green {
+            background-color: #ccffcc;
+        }
+
+        #successMessage {
+            display: none;
+            color: green;
+            font-size: 18px;
+            margin-top: 10px;
+        }
+
+        #userNotice {
+            color: red;
+            font-size: 18px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        #searchResult {
+            margin-top: 20px;
+        }
+
+        #searchResult table {
+            width: 80%;
+            margin: 0 auto;
+            border-collapse: collapse;
+        }
+
+        #searchResult th, #searchResult td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        .item-row {
+            display: none; /* Hide all rows by default */
+        }
+
+        .show {
+            display: table-row; /* Show only the relevant rows */
+        }
+
+        #loadMore {
+            display: none; /* Initially hidden */
+        }
+
+        .disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <!-- واجهة الدخول -->
+    <div id="loginPage" class="page">
+        <!-- رسالة للمستخدم -->
+        <div id="userNotice">
+            الرجاء عزيز المستخدم عليك أن تقوم بنقر زر "تحديث التاريخ" 
+            <br>
+            ستجده في واجهة "قائمة الأصناف" أولاً قبل إضافة الأصناف.
+        </div>
+        <button id="loginButton" onclick="showHomePage()">دخول</button>
+    </div>
+
+    <!-- الصفحة الرئيسية -->
+    <div id="homePage" class="page" style="display:none;">
+        <button onclick="showAddItemPage()">إضافة الصنف</button>
+        <button onclick="showItemListPage()">قائمة الأصناف</button>
+        <button onclick="showSearchDeletePage()">البحث برقم الصنف وحذف الصنف</button>
+    </div>
+
+    <!-- واجهة إضافة الصنف -->
+    <div id="addItemPage" class="page" style="display:none;">
+        <label>اسم الصنف:</label>
+        <input type="text" id="itemName" required><br>
+        <label>رقم الصنف:</label>
+        <input type="text" id="itemNumber" required><br>
+        <label>تاريخ انتهاء الصنف:</label>
+        <input type="date" id="itemExpiryDate" required><br>
+        <label>كمية الصنف:</label>
+        <input type="number" id="itemQuantity" required><br>
+        <label>صورة الصنف:</label>
+        <input type="file" id="itemImage"><br>
+
+        <button onclick="showHomePage()">عودة</button>
+        <button onclick="addItem()">ترحيل البيانات</button>
+        
+        <!-- رسالة نجاح -->
+        <div id="successMessage">لقد تم ترحيل البيانات بنجاح!</div>
+    </div>
+
+    <!-- واجهة قائمة الأصناف -->
+    <div id="itemListPage" class="page" style="display:none;">
+        <button id="updateButton" onclick="updateDates()">تحديث التاريخ</button>
+        <table id="itemTable">
+            <thead>
+                <tr>
+                    <th>اسم الصنف</th>
+                    <th>رقم الصنف</th>
+                    <th>تاريخ انتهاء الصنف</th>
+                    <th>كمية الصنف</th>
+                    <th>صورة الصنف</th>
+                    <th>الأيام المتبقية</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- سيتم إضافة الصفوف هنا برمجياً -->
+            </tbody>
+        </table>
+        <button id="loadMore" onclick="loadMoreItems()">عرض المزيد</button>
+        <button onclick="showHomePage()">عودة</button>
+    </div>
+
+    <!-- واجهة البحث والحذف -->
+    <div id="searchDeletePage" class="page" style="display:none;">
+        <input type="text" id="searchItemNumber" placeholder="أدخل رقم الصنف">
+        <button onclick="searchItem()">بحث</button>
+        <div id="searchResult">
+            <!-- سيتم عرض نتائج البحث هنا -->
+        </div>
+        <button onclick="showHomePage()">عودة</button>
+    </div>
+
+    <script>
+        // تحميل البيانات من LocalStorage
+        let items = JSON.parse(localStorage.getItem('items')) || [];
+        let lastUpdatedDate = new Date(localStorage.getItem('lastUpdatedDate')) || new Date(0);
+
+        function showHomePage() {
+            hideAllPages();
+            document.getElementById('homePage').style.display = 'block';
+            displayItems(); // تحديث قائمة الأصناف كلما تم الانتقال إلى الصفحة الرئيسية
+        }
+
+        function showAddItemPage() {
+            hideAllPages();
+            document.getElementById('addItemPage').style.display = 'block';
+        }
+
+        function showItemListPage() {
+            hideAllPages();
+            document.getElementById('itemListPage').style.display = 'block';
+            displayItems();
+        }
+
+        function showSearchDeletePage() {
+            hideAllPages();
+            document.getElementById('searchDeletePage').style.display = 'block';
+        }
+
+        function hideAllPages() {
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.style.display = 'none');
+        }
+
+        function addItem() {
+            const name = document.getElementById('itemName').value;
+            const number = document.getElementById('itemNumber').value;
+            const expiryDate = document.getElementById('itemExpiryDate').value;
+            const quantity = document.getElementById('itemQuantity').value;
+            const imageFile = document.getElementById('itemImage').files[0];
+
+            // التحقق من ملء جميع الحقول الأساسية
+            if (!name || !number || !expiryDate || !quantity) {
+                alert("يرجى ملء جميع الحقول الأساسية!");
+                return;
+            }
+
+            // التحقق من وجود صنف بنفس الرقم وتاريخ الانتهاء
+            const existingItem = items.find(item => item.number === number && item.expiryDate === expiryDate);
+            if (existingItem) {
+                displayWarningMessage();
+                return;
+            }
+
+            const item = { name, number, expiryDate, quantity };
+
+            if (imageFile) {
+                // إذا كانت صورة موجودة، نقرأها ونضيفها إلى الصنف
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    item.image = e.target.result;
+                    items.push(item);
+
+                    // حفظ البيانات في LocalStorage
+                    localStorage.setItem('items', JSON.stringify(items));
+
+                    // عرض رسالة نجاح
+                    displaySuccessMessage();
+
+                    // مسح الحقول بعد الترحيل
+                    clearFields();
+                };
+                reader.readAsDataURL(imageFile);
+            } else {
+                // إذا لم تكن صورة موجودة، نضيف الصنف بدون صورة
+                item.image = ''; // تعيين قيمة فارغة للصورة
+                items.push(item);
+
+                // حفظ البيانات في LocalStorage
+                localStorage.setItem('items', JSON.stringify(items));
+
+                // عرض رسالة نجاح
+                displaySuccessMessage();
+
+                // مسح الحقول بعد الترحيل
+                clearFields();
+            }
+        }
+
+        function displaySuccessMessage() {
+            const successMessage = document.getElementById('successMessage');
+            successMessage.textContent = "لقد تم ترحيل البيانات بنجاح!";
+            successMessage.style.color = 'green';
+            successMessage.style.display = 'block';
+            setTimeout(() => {
+                successMessage.style.display = 'none';
+            }, 2000);
+        }
+
+        function displayWarningMessage() {
+            const warningMessage = document.getElementById('successMessage');
+            warningMessage.textContent = "البيانات: هذا الصنف بنفس تاريخ انتهاء الصلاحية موجود بالفعل. يرجى التحقق في واجهة البحث.";
+            warningMessage.style.color = 'red';
+            warningMessage.style.display = 'block';
+            setTimeout(() => {
+                warningMessage.style.display = 'none';
+            }, 10000); // عرض الرسالة لمدة 10 ثوانٍ
+        }
+
+        function clearFields() {
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemNumber').value = '';
+            document.getElementById('itemExpiryDate').value = '';
+            document.getElementById('itemQuantity').value = '';
+            document.getElementById('itemImage').value = '';
+        }
+
+        function displayItems(start = 0, count = 20) {
+            const tbody = document.querySelector('#itemTable tbody');
+            tbody.innerHTML = '';
+            const today = new Date();
+
+            items.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+
+            // Display only a subset of items
+            const end = Math.min(start + count, items.length);
+            for (let i = start; i < end; i++) {
+                const item = items[i];
+                const expiryDate = new Date(item.expiryDate);
+                const timeDiff = expiryDate.getTime() - today.getTime();
+                const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+                let rowClass = '';
+                if (daysLeft <= 5) {
+                    rowClass = 'red';
+                } else if (daysLeft <= 20) {
+                    rowClass = 'yellow';
+                } else if (daysLeft <= 30) {
+                    rowClass = 'green';
+                }
+
+                const row = `<tr class="${rowClass} item-row show">
+                    <td>${item.name}</td>
+                    <td>${item.number}</td>
+                    <td>${item.expiryDate}</td>
+                    <td>${item.quantity}</td>
+                    <td><img src="${item.image}" width="50" height="50"></td>
+                    <td>${daysLeft}</td>
+                </tr>`;
+
+                tbody.innerHTML += row;
+            }
+
+            // Show "Load More" button if there are more items to display
+            const loadMoreButton = document.getElementById('loadMore');
+            if (end < items.length) {
+                loadMoreButton.style.display = 'block';
+                loadMoreButton.dataset.start = end; // Store the current end index
+            } else { 
+                loadMoreButton.style.display = 'none';
+            }
+        }
+
+        function loadMoreItems() {
+            // Load the next set of items
+            const loadMoreButton = document.getElementById('loadMore');
+            const start = parseInt(loadMoreButton.dataset.start);
+            displayItems(start);
+        }
+
+        function searchItem() {
+            const searchNumber = document.getElementById('searchItemNumber').value;
+            const resultDiv = document.getElementById('searchResult');
+            const today = new Date();
+
+            if (!searchNumber) {
+                alert("يرجى إدخال رقم الصنف للبحث!");
+                return;
+            }
+
+            // البحث عن الأصناف باستخدام الرقم وترتيبها حسب التاريخ
+            const foundItems = items
+                .filter(item => item.number === searchNumber)
+                .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+
+            if (foundItems.length > 0) {
+                let resultTable = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>اسم الصنف</th>
+                                <th>رقم الصنف</th>
+                                <th>تاريخ انتهاء الصنف</th>
+                                <th>كمية الصنف</th>
+                                <th>صورة الصنف</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                foundItems.forEach(item => {
+                    const expiryDate = new Date(item.expiryDate);
+                    const timeDiff = expiryDate.getTime() - today.getTime();
+                    const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+                    let rowClass = '';
+                    if (daysLeft <= 5) {
+                        rowClass = 'red';
+                    } else if (daysLeft <= 20) {
+                        rowClass = 'yellow';
+                    } else if (daysLeft <= 30) {
+                        rowClass = 'green';
+                    }
+
+                    resultTable += `
+                        <tr class="${rowClass}">
+                            <td>${item.name}</td>
+                            <td>${item.number}</td>
+                            <td>${item.expiryDate}</td>
+                            <td>${item.quantity}</td>
+                            <td><img src="${item.image}" width="50" height="50"></td>
+                            <td>
+                                <button onclick="confirmDelete('${item.number}', '${item.expiryDate}')">حذف</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                resultTable += `
+                        </tbody>
+                    </table>
+                `;
+                resultDiv.innerHTML = resultTable;
+            } else {
+                resultDiv.innerHTML = "<p>لا يوجد صنف بهذا الرقم.</p>";
+            }
+        }
+
+        function confirmDelete(itemNumber, itemExpiryDate) {
+            if (confirm("هل أنت متأكد من أنك تريد حذف هذا الصنف؟")) {
+                deleteItem(itemNumber, itemExpiryDate);
+            }
+        }
+
+        function deleteItem(itemNumber, itemExpiryDate) {
+            // حذف الصنف بناءً على رقم الصنف وتاريخ انتهاء الصنف المحدد
+            items = items.filter(item => !(item.number === itemNumber && item.expiryDate === itemExpiryDate));
+            
+            // تحديث LocalStorage بعد الحذف
+            localStorage.setItem('items', JSON.stringify(items));
+            
+            // إعادة عرض العناصر في قائمة البحث
+            searchItem();
+            
+            // إعادة عرض العناصر في قائمة الأصناف
+            displayItems();
+        }
+
+        function updateDates() {
+            const today = new Date();
+            const lastUpdate = new Date(localStorage.getItem('lastUpdatedDate'));
+
+            // تحقق مما إذا كان قد مر يوم كامل منذ آخر تحديث
+            if (lastUpdatedDate && (today - lastUpdate) < (24 * 60 * 60 * 1000)) {
+                alert("لا يوجد تغير في التاريخ. تحديث التواريخ لا يمكن إجراؤه إلا بعد مرور يوم كامل");
+                document.getElementById('updateButton').classList.add('disabled');
+                return;
+            }
+
+            // تحديث تواريخ الأصناف إذا كان قد مر يوم كامل
+            items = items.map(item => {
+                const expiryDate = new Date(item.expiryDate);
+                expiryDate.setDate(expiryDate.getDate() - 1);
+                item.expiryDate = expiryDate.toISOString().split('T')[0];
+                return item;
+            });
+
+            // حفظ البيانات بعد التحديث اليومي في LocalStorage
+            localStorage.setItem('items', JSON.stringify(items));
+            localStorage.setItem('lastUpdatedDate', new Date().toISOString()); // تحديث تاريخ آخر تحديث
+            lastUpdatedDate = new Date(); // تحديث المتغير
+            displayItems(); // تحديث عرض الأصناف بعد التحديث
+            document.getElementById('updateButton').classList.add('disabled');
+        }
+
+        window.onload = function() {
+            const today = new Date();
+            const lastUpdate = new Date(localStorage.getItem('lastUpdatedDate'));
+
+            // تحقق مما إذا كان قد مر يوم كامل منذ آخر تحديث
+            if (lastUpdate && (today - lastUpdate) >= (24 * 60 * 60 * 1000)) {
+                document.getElementById('updateButton').classList.remove('disabled');
+            } else {
+                document.getElementById('updateButton').classList.add('disabled');
+            }
+        }
+    </script>
+</body>
+</html>
